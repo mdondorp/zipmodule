@@ -1,0 +1,17 @@
+#
+# this is your module manifest and used by Titanium
+# during compilation, packaging, distribution, etc.
+#
+version: 0.2
+apiversion: 2
+description: EyeMobile android zipmodule.
+author: Logic8, Elmar Maan
+copyright: Copyright (c) 2014 by Logic8 B.V.
+
+
+# these should not be edited
+name: zipmodule
+moduleid: com.logic8.zipmodule
+guid: 76efa48f-3eed-41c2-bbc1-79e73d761d8f
+platform: android
+minsdk: 3.2.3.GA

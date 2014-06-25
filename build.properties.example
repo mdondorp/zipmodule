@@ -1,0 +1,3 @@
+titanium.platform=[APPLICATION SUPPORT PATH]/Titanium/mobilesdk/osx/3.2.3.GA/android
+android.platform=[ANDROID SDK PATH]/platforms/android-10
+google.apis=[ANDROID SDK PATH]/add-ons/addon-google_apis-google-10

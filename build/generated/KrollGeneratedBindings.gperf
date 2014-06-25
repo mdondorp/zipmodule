@@ -1,0 +1,16 @@
+%define lookup-function-name lookupGeneratedInit
+%define class-name ZipmoduleBindings
+%{
+
+#include <string.h>
+#include <v8.h>
+#include <KrollBindings.h>
+
+#include "com.logic8.zipmodule.ZipmoduleModule.h"
+
+
+%}
+struct titanium::bindings::BindEntry;
+%%
+com.logic8.zipmodule.ZipmoduleModule, ::com::logic8::zipmodule::ZipmoduleModule::bindProxy, ::com::logic8::zipmodule::ZipmoduleModule::dispose
+%%
