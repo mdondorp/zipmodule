@@ -162,7 +162,7 @@ Handle<Value> ZipmoduleModule::zip(const Arguments& args)
 	if (!args[0]->IsNull()) {
 		Local<Array> arg_0 = Local<Array>::Cast(args[0]);
 		jArguments[0].l =
-			titanium::TypeConverter::jsArrayToJavaArray(env, arg_0);
+			titanium::TypeConverter::jsArrayToJavaStringArray(env, arg_0);
 	} else {
 		jArguments[0].l = NULL;
 	}
