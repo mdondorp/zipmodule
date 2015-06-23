@@ -4,274 +4,304 @@
  * Copyright (c) 2009-2010 by Appcelerator, Inc. All Rights Reserved.
  * Licensed under the terms of the Apache Public License
  * Please see the LICENSE included with this distribution for details.
- *
  */
 package com.logic8.zipmodule;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import android.os.Environment;
+import org.appcelerator.kroll.KrollModule;
+import org.appcelerator.kroll.annotations.Kroll;
+import org.appcelerator.kroll.common.Log;
+import org.appcelerator.titanium.TiApplication;
+
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import org.appcelerator.kroll.KrollModule;
-import org.appcelerator.kroll.annotations.Kroll;
-import org.appcelerator.titanium.TiApplication;
-import org.appcelerator.kroll.common.Log;
-
-import android.os.Environment;
-
 @Kroll.module(name = "Zipmodule", id = "com.logic8.zipmodule")
 public class ZipmoduleModule extends KrollModule {
 
-	// Standard Debugging variables
-	private static final String LCAT = "ZipmoduleModule";
-	private static final int BUFFER = 2048;
+    // Standard Debugging variables
+    private static final String LCAT = "ZipmoduleModule";
+    private static final int BUFFER = 2048;
 
-	static List<String> filelist = new ArrayList<String>();
+    static List<String> filelist = new ArrayList<String>();
 
-	public ZipmoduleModule() {
-		super();
-	}
+    public ZipmoduleModule() {
+        super();
+    }
 
-	@Kroll.onAppCreate
-	public static void onAppCreate(TiApplication app) {
-	}
+    @Kroll.onAppCreate
+    public static void onAppCreate(TiApplication app) {
+    }
 
-	@Kroll.method
-	public String zipADir(String sourceDir, String uniqueid, String username,
-			String targetFile) {
-		try {
-			// create byte buffer
-			byte[] buffer = new byte[1024];
+    private boolean isValidExtension(String fileName, String[] extensions) {
+        Log.d(LCAT, String.format("Checking valid extension : %s", fileName));
+        String[] split = fileName.split("\\.");
+        if (split.length <= 1) {
+//            Log.d(LCAT, String.format("Failed1 valid extension : %s | %s", split.length, fileName));
+            return false;
+        }
+        //get last part of extension
+        String fileExtension = split[split.length - 1];
+        for (String extension : extensions) {
+            if (extension.equalsIgnoreCase(fileExtension)) {
+//                Log.d(LCAT, String.format("success valid extension : %s", fileName));
+                return true;
+            }
+        }
+        Log.d(LCAT, String.format("Invalid file extension found : %s", fileName));
+        return false;
+    }
 
-			// create object of FileOutputStream
-			FileOutputStream fout = new FileOutputStream(targetFile);
+    private boolean exceedsMaxSize(File file, String maxSize){
+        int iMaxSize;
+        try{
+            iMaxSize = Integer.parseInt(maxSize, 10);
+        } catch (NumberFormatException e){
+            iMaxSize = 5000;
+            Log.d(LCAT, "Invalid maxsize given, reverting to default 5000kb");
+        }
+        //iMaxSize is in kilobyte, so we have to add kbyte to byte
+        if (file.exists() && file.length() <= iMaxSize * 1024) {
+//            Log.d(LCAT, String.format("Checking size  : %s |  %s | %s", file.getName(), iMaxSize, file.length()));
+            return true;
+        }
+        else {
+            Log.d(LCAT, String.format("File is too big  : %s |  %s | %s", file.getName(), iMaxSize*1024, file.length()));
+            return false;
+        }
+    }
 
-			// create object of ZipOutputStream from FileOutputStream
-			ZipOutputStream zout = new ZipOutputStream(fout);
-			zout.putNextEntry(new ZipEntry(uniqueid + "/"));
-			zout.putNextEntry(new ZipEntry(uniqueid + "/" + username + "/"));
+    @Kroll.method
+    public String zipADir(String sourceDir, String uniqueid, String username,
+                          String targetFile, String[] extensions, String maxSize) {
+        try {
+            Log.d(LCAT, "maxsize : " + maxSize);
+            // create byte buffer
+            byte[] buffer = new byte[1024];
 
-			// create File object from directory name
-			File dir = new File(sourceDir);
+            // create object of FileOutputStream
+            FileOutputStream fout = new FileOutputStream(targetFile);
 
-			// check to see if this directory exists
-			if (!dir.isDirectory()) {
-				System.out.println(sourceDir + " is not a directory");
-			} else {
-				File[] files = dir.listFiles();
-				if(files.length == 0){
-					System.out.println("No files in " + sourceDir);
-				}
-				for (int i = 0; i < files.length; i++) {
-					if (!files[i].isDirectory()) {
-						System.out.println("Adding " + files[i].getName());
-						// create object of FileInputStream for source file
-						FileInputStream fin = new FileInputStream(files[i]);
+            // create object of ZipOutputStream from FileOutputStream
+            ZipOutputStream zout = new ZipOutputStream(fout);
+            zout.putNextEntry(new ZipEntry(uniqueid + "/"));
+            zout.putNextEntry(new ZipEntry(uniqueid + "/" + username + "/"));
 
-						zout.putNextEntry(new ZipEntry(uniqueid + "/"
-								+ username + "/" + files[i].getName()));
+            // create File object from directory name
+            File dir = new File(sourceDir);
 
-						int length;
+            // check to see if this directory exists
+            if (!dir.isDirectory()) {
+                System.out.println(sourceDir + " is not a directory");
+            } else {
+                File[] files = dir.listFiles();
+                if(files == null){
+                    Log.d(LCAT, "Given file structure is invalid");
+                    return "Given file structure is invalid";
+                }
+                if (files.length == 0) {
+                    System.out.println("No files in " + sourceDir);
+                }
+                for (File file : files) {
+                    if (!file.isDirectory()) {
+                        String fileName = file.getName();
+                        String filePath = uniqueid + "/" + username + "/" + fileName;
+                        if(isValidExtension(fileName, extensions) && !exceedsMaxSize(file, maxSize)){
+                            addFileToZip(new ZipEntry(filePath), buffer, zout, file);
+                        }
+                    } else {
+                        System.out.println("isDirectory!");
 
-						while ((length = fin.read(buffer)) > 0) {
-							zout.write(buffer, 0, length);
-						}
+                        File[] subfiles = file.listFiles();
 
-						zout.closeEntry();
+                        if (subfiles != null) {
+                            for (File subfile : subfiles) {
+                                String fileName = subfile.getName();
+                                String filePath = uniqueid + "/" + username + "/" + file.getName() + "/"
+                                        + fileName;
+                                if(isValidExtension(fileName, extensions) && !exceedsMaxSize(file, maxSize)){
+                                    addFileToZip(new ZipEntry(filePath), buffer, zout, subfile);
+                                }
+                            }
+                        }
+                    }
 
-						// close the InputStream
-						fin.close();
-					} else {
-						System.out.println("isDirectory!");
+                }
+            }
 
-						File[] subfiles = files[i].listFiles();
+            // close the ZipOutputStream
+            zout.close();
 
-						for (int j = 0; j < subfiles.length; j++) {
-							System.out.println("Adding "
-									+ subfiles[j].getName());
-							// create object of FileInputStream for source file
-							FileInputStream fin = new FileInputStream(
-									subfiles[j]);
+            System.out.println("Zip file has been created!");
+            return "success";
 
-							zout.putNextEntry(new ZipEntry(uniqueid + "/"
-									+ username + "/" + files[i].getName() + "/"
-									+ subfiles[j].getName()));
+        } catch (IOException ioe) {
+            System.out.println("IOException :" + ioe);
+            return "false";
+        }
+    }
 
-							int length;
+    private void addFileToZip(ZipEntry e, byte[] buffer, ZipOutputStream zout, File file) throws IOException {
+        System.out.println("Adding " + file.getName());
+        // create object of FileInputStream for source file
+        FileInputStream fin = new FileInputStream(file);
 
-							while ((length = fin.read(buffer)) > 0) {
-								zout.write(buffer, 0, length);
-							}
+        zout.putNextEntry(e);
 
-							zout.closeEntry();
+        int length;
 
-							// close the InputStream
-							fin.close();
-						}
-					}
+        while ((length = fin.read(buffer)) > 0) {
+            zout.write(buffer, 0, length);
+        }
 
-				}
-			}
+        zout.closeEntry();
 
-			// close the ZipOutputStream
-			zout.close();
+        // close the InputStream
+        fin.close();
+    }
 
-			System.out.println("Zip file has been created!");
-			return "success";
+    @SuppressWarnings("resource")
+    @Kroll.method
+    public String splitZip(String filename, String chunkSizeStr) {
+        try {
+            int chunkSize = Integer.parseInt(chunkSizeStr);
 
-		} catch (IOException ioe) {
-			System.out.println("IOException :" + ioe);
-			return "false";
-		}
-	}
+            BufferedInputStream in = new BufferedInputStream(
+                    new FileInputStream(filename));
 
-	@SuppressWarnings("resource")
-	@Kroll.method
-	public String splitZip(String filename, String chunkSizeStr) {
-		try {
-			int chunkSize = Integer.parseInt(chunkSizeStr);
+            File f = new File(filename);
+            long fileSize = f.length();
 
-			BufferedInputStream in = new BufferedInputStream(
-					new FileInputStream(filename));
+            if ((int) fileSize < chunkSize) {
+                return "TooSmallToSplit";
+            }
+            String fileName = filename.substring(0, filename.length() - 4);
+            // loop for each full chunk
+            int subfile;
+            for (subfile = 1; subfile <= fileSize / chunkSize; subfile++) {
+                // open the output file
+                BufferedOutputStream out = new BufferedOutputStream(
+                        new FileOutputStream(fileName + "." + subfile));
 
-			File f = new File(filename);
-			long fileSize = f.length();
+                // write the right amount of bytes
+                for (int currentByte = 0; currentByte < chunkSize; currentByte++) {
+                    // load one byte from the input file and write it to the
+                    // output file
+                    out.write(in.read());
+                }
 
-			if ((int) fileSize < chunkSize) {
-				return "TooSmallToSplit";
-			}
-			String fileName = filename.substring(0, filename.length() - 4);
-			// loop for each full chunk
-			int subfile;
-			for (subfile = 1; subfile <= fileSize / chunkSize; subfile++) {
-				// open the output file
-				BufferedOutputStream out = new BufferedOutputStream(
-						new FileOutputStream(fileName + "." + subfile));
+                // close the file
+                out.close();
+            }
 
-				// write the right amount of bytes
-				for (int currentByte = 0; currentByte < chunkSize; currentByte++) {
-					// load one byte from the input file and write it to the
-					// output file
-					out.write(in.read());
-				}
+            // loop for the last chunk (which may be smaller than the chunk
+            // size)
+            if (fileSize != chunkSize * (subfile - 1)) {
+                // open the output file
+                BufferedOutputStream out = new BufferedOutputStream(
+                        new FileOutputStream(fileName + ".e"));
 
-				// close the file
-				out.close();
-			}
+                // write the rest of the file
+                int b;
+                while ((b = in.read()) != -1)
+                    out.write(b);
 
-			// loop for the last chunk (which may be smaller than the chunk
-			// size)
-			if (fileSize != chunkSize * (subfile - 1)) {
-				// open the output file
-				BufferedOutputStream out = new BufferedOutputStream(
-						new FileOutputStream(fileName + ".e"));
+                // close the file
+                out.close();
+            }
 
-				// write the rest of the file
-				int b;
-				while ((b = in.read()) != -1)
-					out.write(b);
+            // close the file
+            in.close();
+            return "success";
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return "false";
+        }
+    }
 
-				// close the file
-				out.close();
-			}
+    @Kroll.method
+    public void zipADirOud(String sourceDir, String uniqueid, String username,
+                           String targetFile) {
+        try {
+            // create object of FileOutputStream
+            FileOutputStream fout = new FileOutputStream(targetFile);
 
-			// close the file
-			in.close();
-			return "success";
-		} catch (Exception e) {
-			System.out.println(e.getMessage());
-			return "false";
-		}
-	}
+            // create object of ZipOutputStream from FileOutputStream
+            ZipOutputStream zout = new ZipOutputStream(
+                    new BufferedOutputStream(fout));
 
-	@Kroll.method
-	public void zipADirOud(String sourceDir, String uniqueid, String username,
-			String targetFile) {
-		try {
-			// create object of FileOutputStream
-			FileOutputStream fout = new FileOutputStream(targetFile);
+            // create File object from source directory
+            File fileSource = new File(sourceDir);
+            zout.putNextEntry(new ZipEntry(uniqueid + "/"));
+            zout.putNextEntry(new ZipEntry(uniqueid + "/" + username + "/"));
+            zout.putNextEntry(new ZipEntry(uniqueid + "/" + username + "/"
+                    + fileSource.getName()));
+            FileInputStream fin = new FileInputStream(fileSource);
+            for (int c = fin.read(); c != -1; c = fin.read()) {
+                zout.write(c);
+            }
+            fin.close();
+            fout.close();
+            zout.closeEntry();
+            // close the ZipOutputStream
+            zout.close();
 
-			// create object of ZipOutputStream from FileOutputStream
-			ZipOutputStream zout = new ZipOutputStream(
-					new BufferedOutputStream(fout));
+            System.out.println("Zip file has been created!");
 
-			// create File object from source directory
-			File fileSource = new File(sourceDir);
-			zout.putNextEntry(new ZipEntry(uniqueid + "/"));
-			zout.putNextEntry(new ZipEntry(uniqueid + "/" + username + "/"));
-			zout.putNextEntry(new ZipEntry(uniqueid + "/" + username + "/"
-					+ fileSource.getName()));
-			FileInputStream fin = new FileInputStream(fileSource);
-			for (int c = fin.read(); c != -1; c = fin.read()) {
-				zout.write(c);
-			}
-			fin.close();
-			fout.close();
-			zout.closeEntry();
-			// close the ZipOutputStream
-			zout.close();
+        } catch (IOException ioe) {
+            System.out.println("IOException :" + ioe);
+        }
+    }
 
-			System.out.println("Zip file has been created!");
+    @Kroll.method
+    public static void addDirectory(ZipOutputStream zout, File fileSource) {
 
-		} catch (IOException ioe) {
-			System.out.println("IOException :" + ioe);
-		}
-	}
+        // get sub-folder/files list
+        File[] files = fileSource.listFiles();
+        System.out.println("files: " + files.length);
+        System.out.println("Adding directory " + fileSource.getName());
 
-	@Kroll.method
-	public static void addDirectory(ZipOutputStream zout, File fileSource) {
-
-		// get sub-folder/files list
-		File[] files = fileSource.listFiles();
-		System.out.println("files: " + files.length);
-		System.out.println("Adding directory " + fileSource.getName());
-
-		for (int i = 0; i < files.length; i++) {
-			// if the file is directory, call the function recursively
-			if (files[i].isDirectory()) {
-				addDirectory(zout, files[i]);
-				continue;
-			}
+        for (File file : files) {
+            // if the file is directory, call the function recursively
+            if (file.isDirectory()) {
+                addDirectory(zout, file);
+                continue;
+            }
 
 			/*
-			 * we are here means, its file and not directory, so add it to the
+             * we are here means, its file and not directory, so add it to the
 			 * zip file
 			 */
 
-			try {
-				System.out.println("Adding file " + files[i].getName());
-				int buffersize = 1024;
-				// create byte buffer
-				byte[] buffer = new byte[buffersize];
+            try {
+                System.out.println("Adding file " + file.getName());
+                int buffersize = 1024;
+                // create byte buffer
+                byte[] buffer = new byte[buffersize];
 
-				// create object of FileInputStream
-				FileInputStream fin = new FileInputStream(files[i]);
+                // create object of FileInputStream
+                FileInputStream fin = new FileInputStream(file);
 
-				zout.putNextEntry(new ZipEntry(files[i].getName()));
+                zout.putNextEntry(new ZipEntry(file.getName()));
 
 				/*
-				 * After creating entry in the zip file, actually write the
+                 * After creating entry in the zip file, actually write the
 				 * file.
 				 */
-				int length;
-				int fileLength = (int) files[i].length();
-				int bytesRemaining = fileLength;
-				while ((length = fin.read(buffer)) > 0) {
-					bytesRemaining -= length;
-					System.out.println("bytesRemaining: " + bytesRemaining);
-					System.out.println("write " + buffer.length + " bytes");
-					zout.write(buffer, 0, buffer.length);
-					if (bytesRemaining < buffersize) {
-						buffer = new byte[bytesRemaining];
-					}
-				}
+                int length;
+                int bytesRemaining = (int) file.length();
+                while ((length = fin.read(buffer)) > 0) {
+                    bytesRemaining -= length;
+                    System.out.println("bytesRemaining: " + bytesRemaining);
+                    System.out.println("write " + buffer.length + " bytes");
+                    zout.write(buffer, 0, buffer.length);
+                    if (bytesRemaining < buffersize) {
+                        buffer = new byte[bytesRemaining];
+                    }
+                }
 
 				/*
 				 * After writing the file to ZipOutputStream, use
@@ -281,159 +311,159 @@ public class ZipmoduleModule extends KrollModule {
 				 * entry.
 				 */
 
-				zout.closeEntry();
+                zout.closeEntry();
 
-				// close the InputStream
-				fin.close();
+                // close the InputStream
+                fin.close();
 
-			} catch (IOException ioe) {
-				System.out.println("IOException :" + ioe);
-			}
-		}
-	}
+            } catch (IOException ioe) {
+                System.out.println("IOException :" + ioe);
+            }
+        }
+    }
 
-	@Kroll.method
-	public String zip(String[] _files, String _zipFile) {
-		System.out.println(Environment.getDataDirectory().getAbsolutePath());
-		System.out.println("files: " + _files.length);
-		try {
-			BufferedInputStream origin = null;
-			FileOutputStream dest = new FileOutputStream(_zipFile);
+    @Kroll.method
+    public String zip(String[] _files, String _zipFile) {
+        System.out.println(Environment.getDataDirectory().getAbsolutePath());
+        System.out.println("files: " + _files.length);
+        try {
+            BufferedInputStream origin = null;
+            FileOutputStream dest = new FileOutputStream(_zipFile);
 
-			ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(
-					dest));
+            ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(
+                    dest));
 
-			byte data[] = new byte[BUFFER];
+            byte data[] = new byte[BUFFER];
 
-			for (int i = 0; i < _files.length; i++) {
-				Log.v("Compress", "Adding: " + _files[i]);
-				FileInputStream fi = new FileInputStream(_files[i]);
-				origin = new BufferedInputStream(fi, BUFFER);
-				ZipEntry entry = new ZipEntry(_files[i].substring(_files[i]
-						.lastIndexOf("/") + 1));
-				out.putNextEntry(entry);
-				int count;
-				while ((count = origin.read(data, 0, BUFFER)) != -1) {
-					out.write(data, 0, count);
-				}
-				origin.close();
-			}
+            for (String _file : _files) {
+                Log.v("Compress", "Adding: " + _file);
+                FileInputStream fi = new FileInputStream(_file);
+                origin = new BufferedInputStream(fi, BUFFER);
+                ZipEntry entry = new ZipEntry(_file.substring(_file
+                        .lastIndexOf("/") + 1));
+                out.putNextEntry(entry);
+                int count;
+                while ((count = origin.read(data, 0, BUFFER)) != -1) {
+                    out.write(data, 0, count);
+                }
+                origin.close();
+            }
 
-			out.close();
-			return (Environment.getDataDirectory().getAbsolutePath());
-		} catch (Exception e) {
-			e.printStackTrace();
-			return (Environment.getDataDirectory().getAbsolutePath());
-		}
+            out.close();
+            return (Environment.getDataDirectory().getAbsolutePath());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return (Environment.getDataDirectory().getAbsolutePath());
+        }
 
-	}
+    }
 
-	@Kroll.method
-	public String zipDirectory(String dir, String zipPath) throws IOException {
-		File directory = new File(dir);
-		if (!directory.exists()) {
-			return "Directory does not exists!!";
-		}
-		File zip = new File(zipPath);
+    @Kroll.method
+    public String zipDirectory(String dir, String zipPath) throws IOException {
+        File directory = new File(dir);
+        if (!directory.exists()) {
+            return "Directory does not exists!!";
+        }
+        File zip = new File(zipPath);
 
-		ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zip));
-		String s = zipFiles(directory, directory, zos);
+        ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zip));
+        String s = zipFiles(directory, directory, zos);
 
-		zos.close();
-		return s;
-	}
+        zos.close();
+        return s;
+    }
 
-	@Kroll.method
-	public String zipFiles(File directory, File base, ZipOutputStream zos)
-			throws IOException {
-		String length = "";
-		File[] files = directory.listFiles();
-		byte[] readBuffer = new byte[2156];
-		int bytesIn = 0;
-		for (int i = 0, n = files.length; i < n; i++) {
-			if (files[i].isDirectory()) {
-				zipFiles(files[i], base, zos);
-			} else {
-				System.out.println("file: " + files[i].length());
-				FileInputStream fis = new FileInputStream(files[i]);
-				// create a new zip entry
-				ZipEntry anEntry = new ZipEntry(files[i].getName());
-				// place the zip entry in the ZipOutputStream object
-				zos.putNextEntry(anEntry);
-				// now write the content of the file to the ZipOutputStream
-				while ((bytesIn = fis.read(readBuffer)) != -1) {
-					zos.write(readBuffer, 0, bytesIn);
-				}
-				// close the Stream
-				fis.close();
-			}
-		}
-		return "files: " + length;
-	}
+    @Kroll.method
+    public String zipFiles(File directory, File base, ZipOutputStream zos)
+            throws IOException {
+        String length = "";
+        File[] files = directory.listFiles();
+        byte[] readBuffer = new byte[2156];
+        int bytesIn;
+        for (File file : files) {
+            if (file.isDirectory()) {
+                zipFiles(file, base, zos);
+            } else {
+                System.out.println("file: " + file.length());
+                FileInputStream fis = new FileInputStream(file);
+                // create a new zip entry
+                ZipEntry anEntry = new ZipEntry(file.getName());
+                // place the zip entry in the ZipOutputStream object
+                zos.putNextEntry(anEntry);
+                // now write the content of the file to the ZipOutputStream
+                while ((bytesIn = fis.read(readBuffer)) != -1) {
+                    zos.write(readBuffer, 0, bytesIn);
+                }
+                // close the Stream
+                fis.close();
+            }
+        }
+        return "files: " + length;
+    }
 
-	// Properties
-	@Kroll.getProperty
-	public String getExampleProp() {
-		Log.d(LCAT, "get example property");
-		return "hello world";
-	}
+    // Properties
+    @Kroll.getProperty
+    public String getExampleProp() {
+        Log.d(LCAT, "get example property");
+        return "hello world";
+    }
 
-	@Kroll.setProperty
-	public void setExampleProp(String value) {
-		Log.d(LCAT, "set example property: " + value);
-	}
+    @Kroll.setProperty
+    public void setExampleProp(String value) {
+        Log.d(LCAT, "set example property: " + value);
+    }
 
-	@Kroll.method
-	public void generateFileList(String srcfolder) {
-		System.out.println(srcfolder);
-		File srcFolder = new File(srcfolder);
-		// add file only
-		if (srcFolder.isFile()) {
-			// String filename = srcfolder.substring(srcfolder.length()+1,
-			// srcfolder.length());
-			filelist.add(srcfolder);
-		} else if (srcFolder.isDirectory()) {
-			String[] subNote = srcFolder.list();
-			for (String filename : subNote) {
-				generateFileList(srcFolder.getAbsolutePath() + "/" + filename);
-			}
-		}
-	}
+    @Kroll.method
+    public void generateFileList(String srcfolder) {
+        System.out.println(srcfolder);
+        File srcFolder = new File(srcfolder);
+        // add file only
+        if (srcFolder.isFile()) {
+            // String filename = srcfolder.substring(srcfolder.length()+1,
+            // srcfolder.length());
+            filelist.add(srcfolder);
+        } else if (srcFolder.isDirectory()) {
+            String[] subNote = srcFolder.list();
+            for (String filename : subNote) {
+                generateFileList(srcFolder.getAbsolutePath() + "/" + filename);
+            }
+        }
+    }
 
-	@Kroll.method
-	public void zipIt(String zipFile) {
-		byte[] buffer = new byte[1024];
+    @Kroll.method
+    public void zipIt(String zipFile) {
+        byte[] buffer = new byte[1024];
 
-		try {
+        try {
 
-			FileOutputStream fos = new FileOutputStream(zipFile);
-			ZipOutputStream zos = new ZipOutputStream(fos);
+            FileOutputStream fos = new FileOutputStream(zipFile);
+            ZipOutputStream zos = new ZipOutputStream(fos);
 
-			System.out.println("Output to Zip : " + zipFile);
-			int counter = 0;
-			for (String file : filelist) {
+            System.out.println("Output to Zip : " + zipFile);
+            int counter = 0;
+            for (String file : filelist) {
 
-				System.out.println("File Added : " + file);
-				ZipEntry ze = new ZipEntry(file);
-				zos.putNextEntry(ze);
+                System.out.println("File Added : " + file);
+                ZipEntry ze = new ZipEntry(file);
+                zos.putNextEntry(ze);
 
-				FileInputStream in = new FileInputStream(filelist.get(counter));
+                FileInputStream in = new FileInputStream(filelist.get(counter));
 
-				int len;
-				while ((len = in.read(buffer)) > 0) {
-					zos.write(buffer, 0, len);
-				}
-				counter++;
-				in.close();
-			}
+                int len;
+                while ((len = in.read(buffer)) > 0) {
+                    zos.write(buffer, 0, len);
+                }
+                counter++;
+                in.close();
+            }
 
-			zos.closeEntry();
-			// remember close it
-			zos.close();
+            zos.closeEntry();
+            // remember close it
+            zos.close();
 
-			System.out.println("Done");
-		} catch (IOException ex) {
-			ex.printStackTrace();
-		}
-	}
+            System.out.println("Done");
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
 }

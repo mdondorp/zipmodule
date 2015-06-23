@@ -481,9 +481,9 @@ Handle<Value> ZipmoduleModule::zipADir(const Arguments& args)
 	}
 	static jmethodID methodID = NULL;
 	if (!methodID) {
-		methodID = env->GetMethodID(ZipmoduleModule::javaClass, "zipADir", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+		methodID = env->GetMethodID(ZipmoduleModule::javaClass, "zipADir", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
 		if (!methodID) {
-			const char *error = "Couldn't find proxy method 'zipADir' with signature '(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;'";
+			const char *error = "Couldn't find proxy method 'zipADir' with signature '(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;'";
 			LOGE(TAG, error);
 				return titanium::JSException::Error(error);
 		}
@@ -491,13 +491,13 @@ Handle<Value> ZipmoduleModule::zipADir(const Arguments& args)
 
 	titanium::Proxy* proxy = titanium::Proxy::unwrap(args.Holder());
 
-	if (args.Length() < 4) {
+	if (args.Length() < 6) {
 		char errorStringBuffer[100];
-		sprintf(errorStringBuffer, "zipADir: Invalid number of arguments. Expected 4 but got %d", args.Length());
+		sprintf(errorStringBuffer, "zipADir: Invalid number of arguments. Expected 6 but got %d", args.Length());
 		return ThrowException(Exception::Error(String::New(errorStringBuffer)));
 	}
 
-	jvalue jArguments[4];
+	jvalue jArguments[6];
 
 
 
@@ -542,6 +542,31 @@ Handle<Value> ZipmoduleModule::zipADir(const Arguments& args)
 		jArguments[3].l = NULL;
 	}
 
+	if (!args[4]->IsArray() && !args[4]->IsNull()) {
+		const char *error = "Invalid value, expected type Array.";
+		LOGE(TAG, error);
+		return titanium::JSException::Error(error);
+	}
+	
+	
+	if (!args[4]->IsNull()) {
+		Local<Array> arg_4 = Local<Array>::Cast(args[4]);
+		jArguments[4].l =
+			titanium::TypeConverter::jsArrayToJavaStringArray(env, arg_4);
+	} else {
+		jArguments[4].l = NULL;
+	}
+
+	
+	
+	if (!args[5]->IsNull()) {
+		Local<Value> arg_5 = args[5];
+		jArguments[5].l =
+			titanium::TypeConverter::jsValueToJavaString(env, arg_5);
+	} else {
+		jArguments[5].l = NULL;
+	}
+
 	jobject javaProxy = proxy->getJavaObject();
 	jstring jResult = (jstring)env->CallObjectMethodA(javaProxy, methodID, jArguments);
 
@@ -563,6 +588,12 @@ Handle<Value> ZipmoduleModule::zipADir(const Arguments& args)
 
 
 				env->DeleteLocalRef(jArguments[3].l);
+
+
+				env->DeleteLocalRef(jArguments[4].l);
+
+
+				env->DeleteLocalRef(jArguments[5].l);
 
 
 	if (env->ExceptionCheck()) {

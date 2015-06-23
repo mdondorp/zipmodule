@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Titanium">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/Library/Application Support/Titanium/mobilesdk/osx/4.0.0.GA/android/kroll-v8.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
