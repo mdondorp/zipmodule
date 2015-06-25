@@ -40,7 +40,7 @@ public class ZipmoduleModule extends KrollModule {
         Log.d(LCAT, String.format("Checking valid extension : %s", fileName));
         String[] split = fileName.split("\\.");
         if (split.length <= 1) {
-//            Log.d(LCAT, String.format("Failed1 valid extension : %s | %s", split.length, fileName));
+            Log.d(LCAT, String.format("Invalid file type : %s | %s", split.length, fileName));
             return false;
         }
         //get last part of extension
@@ -66,11 +66,11 @@ public class ZipmoduleModule extends KrollModule {
         //iMaxSize is in kilobyte, so we have to add kbyte to byte
         if (file.exists() && file.length() <= iMaxSize * 1024) {
 //            Log.d(LCAT, String.format("Checking size  : %s |  %s | %s", file.getName(), iMaxSize, file.length()));
-            return true;
+            return false;
         }
         else {
             Log.d(LCAT, String.format("File is too big  : %s |  %s | %s", file.getName(), iMaxSize*1024, file.length()));
-            return false;
+            return true;
         }
     }
 
@@ -78,7 +78,6 @@ public class ZipmoduleModule extends KrollModule {
     public String zipADir(String sourceDir, String uniqueid, String username,
                           String targetFile, String[] extensions, String maxSize) {
         try {
-            Log.d(LCAT, "maxsize : " + maxSize);
             // create byte buffer
             byte[] buffer = new byte[1024];
 
