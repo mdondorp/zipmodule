@@ -1,0 +1,2 @@
+"/Users/michiel/Development/Appcelerator_Studio_Workspace/zipmodule/build/generated/java/com/logic8/zipmodule/ZipmoduleBootstrap.java"
+"/Users/michiel/Development/Appcelerator_Studio_Workspace/zipmodule/src/com/logic8/zipmodule/ZipmoduleModule.java"

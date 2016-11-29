@@ -20,15 +20,15 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @Kroll.module(name = "Zipmodule", id = "com.logic8.zipmodule")
-public class ZipmoduleModule extends KrollModule {
+public class ZipModule extends KrollModule {
 
     // Standard Debugging variables
-    private static final String LCAT = "ZipmoduleModule";
+    private static final String LCAT = "ZipModule";
     private static final int BUFFER = 2048;
 
     static List<String> filelist = new ArrayList<String>();
 
-    public ZipmoduleModule() {
+    public ZipModule() {
         super();
     }
 
@@ -55,11 +55,11 @@ public class ZipmoduleModule extends KrollModule {
         return false;
     }
 
-    private boolean exceedsMaxSize(File file, String maxSize){
+    private boolean exceedsMaxSize(File file, String maxSize) {
         int iMaxSize;
-        try{
+        try {
             iMaxSize = Integer.parseInt(maxSize, 10);
-        } catch (NumberFormatException e){
+        } catch (NumberFormatException ignored) {
             iMaxSize = 5000;
             Log.d(LCAT, "Invalid maxsize given, reverting to default 5000kb");
         }
@@ -67,9 +67,8 @@ public class ZipmoduleModule extends KrollModule {
         if (file.exists() && file.length() <= iMaxSize * 1024) {
 //            Log.d(LCAT, String.format("Checking size  : %s |  %s | %s", file.getName(), iMaxSize, file.length()));
             return false;
-        }
-        else {
-            Log.d(LCAT, String.format("File is too big  : %s |  %s | %s", file.getName(), iMaxSize*1024, file.length()));
+        } else {
+            Log.d(LCAT, String.format("File is too big  : %s |  %s | %s", file.getName(), iMaxSize * 1024, file.length()));
             return true;
         }
     }
@@ -97,7 +96,7 @@ public class ZipmoduleModule extends KrollModule {
                 System.out.println(sourceDir + " is not a directory");
             } else {
                 File[] files = dir.listFiles();
-                if(files == null){
+                if (files == null) {
                     Log.d(LCAT, "Given file structure is invalid");
                     return "Given file structure is invalid";
                 }
@@ -108,7 +107,7 @@ public class ZipmoduleModule extends KrollModule {
                     if (!file.isDirectory()) {
                         String fileName = file.getName();
                         String filePath = uniqueid + "/" + username + "/" + fileName;
-                        if(isValidExtension(fileName, extensions) && !exceedsMaxSize(file, maxSize)){
+                        if (isValidExtension(fileName, extensions) && !exceedsMaxSize(file, maxSize)) {
                             addFileToZip(new ZipEntry(filePath), buffer, zout, file);
                         }
                     } else {
@@ -121,7 +120,7 @@ public class ZipmoduleModule extends KrollModule {
                                 String fileName = subfile.getName();
                                 String filePath = uniqueid + "/" + username + "/" + file.getName() + "/"
                                         + fileName;
-                                if(isValidExtension(fileName, extensions) && !exceedsMaxSize(file, maxSize)){
+                                if (isValidExtension(fileName, extensions) && !exceedsMaxSize(file, maxSize)) {
                                     addFileToZip(new ZipEntry(filePath), buffer, zout, subfile);
                                 }
                             }
@@ -140,6 +139,47 @@ public class ZipmoduleModule extends KrollModule {
         } catch (IOException ioe) {
             System.out.println("IOException :" + ioe);
             return "false";
+        }
+    }
+
+    @Kroll.method(name = "zipAll")
+    public boolean zipAll(String sourceDirPath, String targetFilePath) {
+        File dir = new File(sourceDirPath);
+        File zipFile = new File(targetFilePath);
+        try {
+            FileOutputStream fout = new FileOutputStream(zipFile);
+            ZipOutputStream zout = new ZipOutputStream(fout);
+            zipSubDirectory("", dir, zout);
+            zout.close();
+        } catch (FileNotFoundException e) {
+            Log.d(LCAT, "File not found" + targetFilePath);
+            return false;
+        } catch (IOException e) {
+            Log.d(LCAT, "I/O excpetion " + e.getMessage());
+            return false;
+        }
+        return true;
+    }
+
+    private static void zipSubDirectory(String basePath, File dir, ZipOutputStream zout) throws IOException {
+        byte[] buffer = new byte[4096];
+        File[] files = dir.listFiles();
+        for (File file : files) {
+            if (file.isDirectory()) {
+                String path = basePath + file.getName() + "/";
+                zout.putNextEntry(new ZipEntry(path));
+                zipSubDirectory(path, file, zout);
+                zout.closeEntry();
+            } else {
+                FileInputStream fin = new FileInputStream(file);
+                zout.putNextEntry(new ZipEntry(basePath + file.getName()));
+                int length;
+                while ((length = fin.read(buffer)) > 0) {
+                    zout.write(buffer, 0, length);
+                }
+                zout.closeEntry();
+                fin.close();
+            }
         }
     }
 
@@ -162,7 +202,6 @@ public class ZipmoduleModule extends KrollModule {
         fin.close();
     }
 
-    @SuppressWarnings("resource")
     @Kroll.method
     public String splitZip(String filename, String chunkSizeStr) {
         try {
@@ -222,40 +261,6 @@ public class ZipmoduleModule extends KrollModule {
     }
 
     @Kroll.method
-    public void zipADirOud(String sourceDir, String uniqueid, String username,
-                           String targetFile) {
-        try {
-            // create object of FileOutputStream
-            FileOutputStream fout = new FileOutputStream(targetFile);
-
-            // create object of ZipOutputStream from FileOutputStream
-            ZipOutputStream zout = new ZipOutputStream(
-                    new BufferedOutputStream(fout));
-
-            // create File object from source directory
-            File fileSource = new File(sourceDir);
-            zout.putNextEntry(new ZipEntry(uniqueid + "/"));
-            zout.putNextEntry(new ZipEntry(uniqueid + "/" + username + "/"));
-            zout.putNextEntry(new ZipEntry(uniqueid + "/" + username + "/"
-                    + fileSource.getName()));
-            FileInputStream fin = new FileInputStream(fileSource);
-            for (int c = fin.read(); c != -1; c = fin.read()) {
-                zout.write(c);
-            }
-            fin.close();
-            fout.close();
-            zout.closeEntry();
-            // close the ZipOutputStream
-            zout.close();
-
-            System.out.println("Zip file has been created!");
-
-        } catch (IOException ioe) {
-            System.out.println("IOException :" + ioe);
-        }
-    }
-
-    @Kroll.method
     public static void addDirectory(ZipOutputStream zout, File fileSource) {
 
         // get sub-folder/files list
@@ -270,10 +275,10 @@ public class ZipmoduleModule extends KrollModule {
                 continue;
             }
 
-			/*
+            /*
              * we are here means, its file and not directory, so add it to the
-			 * zip file
-			 */
+             * zip file
+             */
 
             try {
                 System.out.println("Adding file " + file.getName());
@@ -286,10 +291,10 @@ public class ZipmoduleModule extends KrollModule {
 
                 zout.putNextEntry(new ZipEntry(file.getName()));
 
-				/*
+                /*
                  * After creating entry in the zip file, actually write the
-				 * file.
-				 */
+                 * file.
+                 */
                 int length;
                 int bytesRemaining = (int) file.length();
                 while ((length = fin.read(buffer)) > 0) {
@@ -302,13 +307,13 @@ public class ZipmoduleModule extends KrollModule {
                     }
                 }
 
-				/*
-				 * After writing the file to ZipOutputStream, use
-				 * 
-				 * void closeEntry() method of ZipOutputStream class to close
-				 * the current entry and position the stream to write the next
-				 * entry.
-				 */
+                /*
+                 * After writing the file to ZipOutputStream, use
+                 *
+                 * void closeEntry() method of ZipOutputStream class to close
+                 * the current entry and position the stream to write the next
+                 * entry.
+                 */
 
                 zout.closeEntry();
 

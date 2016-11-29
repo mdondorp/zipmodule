@@ -1,2 +1,6 @@
 .classpath
 build.properties
+build
+zipmodule.iml
+build.properties
+.idea
