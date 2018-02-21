@@ -2,17 +2,17 @@
 # this is your module manifest and used by Titanium
 # during compilation, packaging, distribution, etc.
 #
-version: 0.28
-apiversion: 2
+version: 0.30
+apiversion: 4
 description: EyeMobile android zipmodule.
 author: Logic8, Elmar Maan, M Dondorp
 copyright: Copyright (c) 2016 by Logic8 B.V.
-architectures: armeabi armeabi-v7a x86
-license: Apache v2
+architectures: armeabi-v7a x86
+license: See license file
 
 # these should not be edited
 name: zipmodule
 moduleid: com.logic8.zipmodule
 guid: 76efa48f-3eed-41c2-bbc1-79e73d761d8f
 platform: android
-minsdk: 6.0.0.GA
+minsdk: 7.0.0
